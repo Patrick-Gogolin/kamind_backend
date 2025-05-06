@@ -1,6 +1,7 @@
 from rest_framework.generics import ListCreateAPIView
 from rest_framework.permissions import IsAuthenticated
 from ..models import Board
+from django.db.models import Q
 from .serializers import BoardSerializer
 from rest_framework.response import Response
 from rest_framework import generics
@@ -11,7 +12,13 @@ class BoardListCreateView(ListCreateAPIView):
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        return Board.objects.filter(owner=self.request.user.id)
+        user = self.request.user
+        return Board.objects.filter(Q(owner=user) | Q(members=user)).distinct()# zeige die Boards, die dem eingeloggten User gehören oder bei denen er Member ist
 
     def perform_create(self, serializer):
         serializer.save()
+
+class BoardDetailView(generics.RetrieveDestroyAPIView):
+    queryset = Board.objects.all()
+    serializer_class = BoardSerializer
+    permission_classes = [IsAuthenticated]

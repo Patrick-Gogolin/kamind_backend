@@ -1,14 +1,31 @@
 from rest_framework import serializers
-from ..models import Board
+from ..models import Board, Task
 from django.contrib.auth.models import User
 
 
+class UserSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = ['id', 'email', 'first_name', 'last_name']
+
+class TaskSerializer(serializers.ModelSerializer):
+    assignee = UserSerializer(read_only=True)  # Zeigt die Benutzerdaten des Assignees
+    reviewer = UserSerializer(read_only=True)  # Zeigt die Benutzerdaten des Reviewers
+
+    class Meta:
+        model = Task
+        fields = [
+            'id', 'title', 'description', 'status', 'priority',
+            'assignee', 'reviewer', 'due_date', 'comments_count'
+        ]
 
 class BoardSerializer(serializers.ModelSerializer):
-    members = serializers.ListField( #Ein Feld namens members, das eine Liste von Zahlen (IDs der Benutzer) erwartet. Es ist write_only, d. h. es wird nur beim Schreiben (z. B. Erstellen) verwendet, nicht beim Auslesen
-        child=serializers.IntegerField(),
-        write_only=True
-    )
+    #members = serializers.ListField( #Ein Feld namens members, das eine Liste von Zahlen (IDs der Benutzer) erwartet. Es ist write_only, d. h. es wird nur beim Schreiben (z. B. Erstellen) verwendet, nicht beim Auslesen
+        #child=serializers.IntegerField(),
+        #write_only=True
+    #)
+    tasks = TaskSerializer(many=True, read_only=True)
+    members = UserSerializer(many=True, read_only=True)
     
     member_count = serializers.SerializerMethodField(read_only=True)# Ein Feld, das später berechnet wird – hier die Anzahl der Mitglieder. Es ist nur zum Lesen gedacht.
     ticket_count = serializers.SerializerMethodField(read_only=True)# Ein weiteres berechnetes Feld: die Anzahl der „Tickets“ (z. B. Aufgaben) auf dem Board.
@@ -19,7 +36,7 @@ class BoardSerializer(serializers.ModelSerializer):
     class Meta: #Hier sagen wir: Dieser Serializer basiert auf dem Modell Board und gibt genau diese Felder aus.
         model = Board
         fields = [
-            'id', 'title', 'members',
+            'id', 'title', 'members', 'tasks',
             'member_count', 'ticket_count',
             'tasks_to_do_count', 'tasks_high_prio_count', 'owner_id'
         ]
