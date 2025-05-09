@@ -29,10 +29,10 @@ class RegistrationView(APIView):
                 return Response(data, status=status.HTTP_201_CREATED)
             
             except:
-                return Response(status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+                return Response(status=status.HTTP_400_BAD_REQUEST)
             
         else:
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+            return Response(serializer.errors, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 class CustomLoginView(APIView):
     permission_classes = [AllowAny]

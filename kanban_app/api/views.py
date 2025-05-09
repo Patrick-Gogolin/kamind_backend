@@ -1,10 +1,12 @@
 from rest_framework.generics import ListCreateAPIView
 from rest_framework.permissions import IsAuthenticated
-from ..models import Board
+from kanban_app.models import Board, Task
+from kanban_app.api.permissions import IsBoardMember
 from django.db.models import Q
-from .serializers import BoardSerializer
+from .serializers import BoardSerializer, BoardDetailSerializer, TaskSerializer
 from rest_framework.response import Response
 from rest_framework import generics
+
 
 class BoardListCreateView(ListCreateAPIView):
     queryset = Board.objects.all()
@@ -20,5 +22,10 @@ class BoardListCreateView(ListCreateAPIView):
 
 class BoardDetailView(generics.RetrieveDestroyAPIView):
     queryset = Board.objects.all()
-    serializer_class = BoardSerializer
+    serializer_class = BoardDetailSerializer
     permission_classes = [IsAuthenticated]
+
+class TaskCreateView(generics.CreateAPIView):
+    queryset = Task.objects.all()
+    serializer_class = TaskSerializer
+    permission_classes = [IsAuthenticated, IsBoardMember]
