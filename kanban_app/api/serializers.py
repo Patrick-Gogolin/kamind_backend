@@ -33,8 +33,22 @@ class TaskSerializer(serializers.ModelSerializer):
         request_user = self.context['request'].user
         board = data.get('board')
 
+        if not board:
+            task = self.context['view'].get_object()
+            board = task.board
+            print(board)
+
         if not board.members.filter(id=request_user.id).exists():
             raise serializers.ValidationError("Not a member of the board")
+
+        assignee_id = data.get('assignee_id')
+        reviewer_id = data.get('reviewer_id')
+
+        if assignee_id and not board.members.filter(id=assignee_id).exists():
+            raise serializers.ValidationError("Assignee is not a member of the board")
+        
+        if reviewer_id and not board.members.filter(id=reviewer_id).exists():
+            raise serializers.ValidationError("Reviewer is not a member of the board")
         
         return data
     
@@ -72,13 +86,13 @@ class BoardSerializer(serializers.ModelSerializer):
         return obj.members.count()
     
     def get_ticket_count(self, obj): #Zählt, wie viele „Tickets“ mit dem Board verknüpft sind (wenn es welche gibt).
-        return obj.ticket_set.count() if hasattr(obj, 'ticket_set') else 0
+        return obj.tasks.count()
     
     def get_tasks_to_do_count(self, obj): #Hier ist Platz für zukünftige Logik, z. B. um offene Aufgaben zu zählen.
-        return 0  # Implementiere bei Bedarf
+        return obj.tasks.filter(status='todo').count()
     
     def get_tasks_high_prio_count(self, obj): #Auch hier: Kann später angepasst werden, um z. B. Aufgaben mit hoher Priorität zu zählen.
-        return 0  # Implementiere bei Bedarf
+        return obj.tasks.filter(priority='high').count()
 
     def create(self, validated_data):#Diese Methode wird aufgerufen, wenn ein neues Board erstellt wird:, validated_data enthält alle geprüften Daten, die vom Client gesendet wurden (z. B. per API)
         members_ids = validated_data.pop('members')#pop('members') holt sich den Eintrag 'members' und entfernt ihn gleichzeitig aus validated_data, Weil wir members nicht direkt an Board.objects.create() übergeben wollen, sondern es manuell später
