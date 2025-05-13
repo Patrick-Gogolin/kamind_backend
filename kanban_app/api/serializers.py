@@ -115,3 +115,23 @@ class BoardDetailSerializer(serializers.ModelSerializer):
             'id', 'title', 'owner_id', 'members', 'tasks'
         ]
 
+class BoardUpdateSerializer(serializers.ModelSerializer):
+    members = serializers.ListField(child=serializers.IntegerField(), write_only=True)
+    owner_data = UserSerializer(source='owner', read_only=True)
+    members_data = UserSerializer(source='members', many=True, read_only=True)
+
+    class Meta:
+        model = Board
+        fields = ['id', 'title', 'members', 'owner_data', 'members_data']
+
+    def update(self, instance, validated_data):
+        members_ids = validated_data.pop('members', [])
+
+        users = User.objects.filter(id__in=members_ids)
+        if len(users) != len(set(members_ids)):
+            raise serializers.ValidationError("Ein oder mehrere Benutzer Ids sind ungültig")
+        
+        instance.title = validated_data.get('title', instance.title)
+        instance.save()
+        instance.members.set(users)
+        return instance
