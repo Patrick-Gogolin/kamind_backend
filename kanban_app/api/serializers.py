@@ -127,6 +127,10 @@ class BoardUpdateSerializer(serializers.ModelSerializer):
     def update(self, instance, validated_data):
         members_ids = validated_data.pop('members', [])
 
+        owner_id = instance.owner.id
+        if owner_id not in members_ids:
+            members_ids.append(owner_id)
+
         users = User.objects.filter(id__in=members_ids)
         if len(users) != len(set(members_ids)):
             raise serializers.ValidationError("Ein oder mehrere Benutzer Ids sind ungültig")
