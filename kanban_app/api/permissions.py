@@ -31,17 +31,15 @@ class IsTaskBoardMemberOrOwner(BasePermission):
     
 class IsBoardMemberOrOwner(BasePermission):
     def has_object_permission(self, request, view, obj):
+
+        if request.method == 'DELETE':
+            return obj.owner == request.user
+        
         return (
             obj.owner == request.user or
             obj.members.filter(id=request.user.id).exists()
         )
     
     def has_permission(self, request, view):
-        if request.method == 'POST':
-            return request.user.is_authenticated
+        return request.user.is_authenticated
         
-        if request.method == 'GET':
-            return request.user.is_authenticated
-        
-        return True
-

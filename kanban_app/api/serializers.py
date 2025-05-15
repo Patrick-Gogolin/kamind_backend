@@ -36,7 +36,6 @@ class TaskSerializer(serializers.ModelSerializer):
         if not board:
             task = self.context['view'].get_object()
             board = task.board
-            print(board)
 
         if not board.members.filter(id=request_user.id).exists():
             raise serializers.ValidationError("Not a member of the board")
