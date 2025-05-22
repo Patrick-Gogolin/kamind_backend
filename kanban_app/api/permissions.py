@@ -8,6 +8,12 @@ class IsTaskBoardMemberOrOwner(BasePermission):
     def has_object_permission(self, request, view, obj):
         board = obj.board
 
+        if request.method == 'DELETE':
+            return (
+                board.owner == request.user or
+                obj.created_by == request.user
+            )
+
         return (
             board.owner == request.user or
             board.members.filter(id=request.user.id).exists()

@@ -53,13 +53,14 @@ class TaskSerializer(serializers.ModelSerializer):
     
     def create(self, validated_data):
         print(validated_data)
+        request_user = self.context['request'].user
         assignee_id = validated_data.pop('assignee_id', None)
         reviewer_id = validated_data.pop('reviewer_id', None)
 
         assignee = User.objects.get(id=assignee_id) if assignee_id else None
         reviewer = User.objects.get(id=reviewer_id) if reviewer_id else None
 
-        task = Task.objects.create(**validated_data, assignee=assignee, reviewer=reviewer)
+        task = Task.objects.create(**validated_data, assignee=assignee, reviewer=reviewer, created_by=request_user)
         return task
 
 class BoardSerializer(serializers.ModelSerializer):
@@ -88,7 +89,7 @@ class BoardSerializer(serializers.ModelSerializer):
         return obj.tasks.count()
     
     def get_tasks_to_do_count(self, obj): #Hier ist Platz für zukünftige Logik, z. B. um offene Aufgaben zu zählen.
-        return obj.tasks.filter(status='todo').count()
+        return obj.tasks.filter(status='to-do').count()
     
     def get_tasks_high_prio_count(self, obj): #Auch hier: Kann später angepasst werden, um z. B. Aufgaben mit hoher Priorität zu zählen.
         return obj.tasks.filter(priority='high').count()
