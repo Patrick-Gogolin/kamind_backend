@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from ..models import Board, Task
+from ..models import Board, Task, Comment
 from django.contrib.auth.models import User
 
 
@@ -19,15 +19,16 @@ class TaskSerializer(serializers.ModelSerializer):
     reviewer_id = serializers.IntegerField(write_only=True, required=False, allow_null=True)
     assignee = UserSerializer(read_only=True)
     reviewer = UserSerializer(read_only=True)
+    comments_count = serializers.IntegerField(read_only=True)
 
     class Meta:
         model = Task
         fields = [
             'id', 'board', 'title', 'description', 'status', 'priority',
             'assignee_id', 'reviewer_id', 'assignee', 'reviewer',
-            'due_date'
+            'due_date', 'comments_count'
         ]
-        read_only_fields = ['id', 'assignee', 'reviewer']
+        read_only_fields = ['id', 'assignee', 'reviewer', 'comments_count']
     
     def validate(self, data):
         request_user = self.context['request'].user
@@ -139,3 +140,20 @@ class BoardUpdateSerializer(serializers.ModelSerializer):
         instance.save()
         instance.members.set(users)
         return instance
+
+
+class CommentSerializer(serializers.ModelSerializer):
+    author = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Comment
+        fields = ['id', 'created_at', 'author', 'content']
+        read_only_fields = ['id', 'created_at', 'author']
+
+    def get_author(self, obj):
+        return f"{obj.author.first_name} {obj.author.last_name}".strip()#obj ist ein einzelner KOmmentar, obj.user ist der user, der den KOmmentar geschrieben hat
+    
+    def create(self, validated_data): #Methode wird aufgerufen wenn ein neuer Kommentar gespeichert wird
+        request = self.context['request']
+        validated_data['author'] = request.user
+        return super().create(validated_data)

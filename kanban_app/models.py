@@ -33,3 +33,10 @@ class Task(models.Model):
     due_date = models.DateField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     created_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name='created_tasks')
+
+
+class Comment(models.Model):
+    task = models.ForeignKey(Task, on_delete=models.CASCADE, related_name='comments') #Zu welcher Task gehört der Kommentar?
+    author = models.ForeignKey(User, on_delete=models.CASCADE)# Wer hat ihn geschrieben?
+    content = models.TextField() # Was steht drin?
+    created_at = models.DateTimeField(auto_now_add=True) # Wann wurde er geschrieben?
