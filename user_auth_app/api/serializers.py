@@ -42,20 +42,22 @@ class RegistrationSerializer(serializers.ModelSerializer):
         if User.objects.filter(email=value).exists():
             raise serializers.ValidationError("Diese E-Mail wird bereits verwendet.")
         return value
+    
+    def validate(self, data):
+        if data['password'] != data['repeated_password']:
+            raise serializers.ValidationError({'repeated_password': 'Passwords do not match'})
+        return data
 
-    def save(self):
-        pw = self.validated_data['password']
-        repeated_pw = self.validated_data['repeated_password']
-        full_name = self.validated_data['fullname']
+    def create(self, validated_data):
+        password = validated_data.pop('password')
+        validated_data.pop('repeated_password')
+        full_name = validated_data.pop('fullname')
 
-        if pw != repeated_pw:
-            raise serializers.ValidationError({'error': 'password dont match'})
-        
         parts = full_name.strip().split()
         first_name = parts[0]
         last_name = ' '.join(parts[1:])
   
         account = User(email=self.validated_data['email'],  username=self.validated_data['email'], first_name=first_name, last_name=last_name)
-        account.set_password(pw)
+        account.set_password(password)
         account.save()
         return account
