@@ -15,10 +15,8 @@ class BoardListCreateView(ListCreateAPIView):
 
     def get_queryset(self):
         user = self.request.user
-        return Board.objects.filter(Q(owner=user) | Q(members=user)).distinct()# zeige die Boards, die dem eingeloggten User gehören oder bei denen er Member ist
+        return Board.objects.filter(Q(owner=user) | Q(members=user)).distinct()
 
-    def perform_create(self, serializer):
-        serializer.save()
 
 class BoardDetailView(generics.RetrieveUpdateDestroyAPIView):
     queryset = Board.objects.all()

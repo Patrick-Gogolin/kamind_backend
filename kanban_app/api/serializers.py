@@ -19,12 +19,12 @@ class TaskSerializer(serializers.ModelSerializer):
     reviewer_id = serializers.IntegerField(write_only=True, required=False, allow_null=True)
     assignee = UserSerializer(read_only=True)
     reviewer = UserSerializer(read_only=True)
-    comments_count = serializers.IntegerField(read_only=True)
+    comments_count = serializers.SerializerMethodField(read_only=True)
 
     class Meta:
         model = Task
         fields = [
-            'id', 'board', 'title', 'description', 'status', 'priority',
+            'id', 'title', 'description', 'status', 'priority',
             'assignee_id', 'reviewer_id', 'assignee', 'reviewer',
             'due_date', 'comments_count'
         ]
@@ -52,6 +52,9 @@ class TaskSerializer(serializers.ModelSerializer):
         
         return data
     
+    def get_comments_count(self, obj):
+        return obj.comments.count()
+    
     def create(self, validated_data):
         print(validated_data)
         request_user = self.context['request'].user
@@ -67,15 +70,15 @@ class TaskSerializer(serializers.ModelSerializer):
 class BoardSerializer(serializers.ModelSerializer):
     members = serializers.ListField( 
         child=serializers.IntegerField(),
-        write_only=True) #Ein Feld namens members, das eine Liste von Zahlen (IDs der Benutzer) erwartet. Es ist write_only, d. h. es wird nur beim Schreiben (z. B. Erstellen) verwendet, nicht beim Auslesen
+        write_only=True)
     
-    member_count = serializers.SerializerMethodField(read_only=True)# Ein Feld, das später berechnet wird – hier die Anzahl der Mitglieder. Es ist nur zum Lesen gedacht.
-    ticket_count = serializers.SerializerMethodField(read_only=True)# Ein weiteres berechnetes Feld: die Anzahl der „Tickets“ (z. B. Aufgaben) auf dem Board.
-    tasks_to_do_count = serializers.SerializerMethodField(read_only=True)# Noch zwei berechnete Felder, derzeit aber noch nicht implementiert – Rückgabe ist einfach 0.
-    tasks_high_prio_count = serializers.SerializerMethodField(read_only=True)# Noch zwei berechnete Felder, derzeit aber noch nicht implementiert – Rückgabe ist einfach 0.
-    #owner_id = serializers.IntegerField(source='owner.id', read_only=True)# Zeigt die ID des Besitzers des Boards an. Sie wird automatisch aus owner.id gelesen.
+    member_count = serializers.SerializerMethodField(read_only=True)
+    ticket_count = serializers.SerializerMethodField(read_only=True)
+    tasks_to_do_count = serializers.SerializerMethodField(read_only=True)
+    tasks_high_prio_count = serializers.SerializerMethodField(read_only=True)
+    owner_id = serializers.IntegerField(source='owner.id', read_only=True)
 
-    class Meta: #Hier sagen wir: Dieser Serializer basiert auf dem Modell Board und gibt genau diese Felder aus.
+    class Meta:
         model = Board
         fields = [
             'id', 'title', 'members',
@@ -83,33 +86,39 @@ class BoardSerializer(serializers.ModelSerializer):
             'tasks_to_do_count', 'tasks_high_prio_count', 'owner_id'
         ]
 
-    def get_member_count(self, obj): #Zählt, wie viele Mitglieder das Board hat.
+    def validate(self, data):
+        members_ids = data.get('members', [])
+        users = User.objects.filter(id__in=members_ids)
+        if len(users) != len(set(members_ids)):
+            raise serializers.ValidationError("Ein oder mehrere Benutzer existieren nicht")
+        return data
+
+    def get_member_count(self, obj):
         return obj.members.count()
     
-    def get_ticket_count(self, obj): #Zählt, wie viele „Tickets“ mit dem Board verknüpft sind (wenn es welche gibt).
+    def get_ticket_count(self, obj):
         return obj.tasks.count()
     
-    def get_tasks_to_do_count(self, obj): #Hier ist Platz für zukünftige Logik, z. B. um offene Aufgaben zu zählen.
+    def get_tasks_to_do_count(self, obj):
         return obj.tasks.filter(status='to-do').count()
     
-    def get_tasks_high_prio_count(self, obj): #Auch hier: Kann später angepasst werden, um z. B. Aufgaben mit hoher Priorität zu zählen.
+    def get_tasks_high_prio_count(self, obj):
         return obj.tasks.filter(priority='high').count()
 
-    def create(self, validated_data):#Diese Methode wird aufgerufen, wenn ein neues Board erstellt wird:, validated_data enthält alle geprüften Daten, die vom Client gesendet wurden (z. B. per API)
-        members_ids = validated_data.pop('members')#pop('members') holt sich den Eintrag 'members' und entfernt ihn gleichzeitig aus validated_data, Weil wir members nicht direkt an Board.objects.create() übergeben wollen, sondern es manuell später
-        owner = self.context['request'].user #gibt den aktuell eingeloggten Benutzer zurück – also den Ersteller des Boards.
+    def create(self, validated_data):
+        members_ids = validated_data.pop('members')
+        owner = self.context['request'].user
         if owner.id not in members_ids:
             members_ids.append(owner.id)
         users = User.objects.filter(id__in=members_ids)
-        if len(users) != len(set(members_ids)):
-            raise serializers.ValidationError("Ein oder mehrere benutzer existieren nicht")
-        board = Board.objects.create(title=validated_data['title'], owner=owner)#Ein neues Board-Objekt wird erstellt.,title wird aus dem verbleibenden validated_data geholt., owner ist der aktuelle Benutzer (aus Zeile 2).
-        board.members.set(users)# board.members ist eine ManyToMany-Beziehung., .set(...) ersetzt die bestehenden Mitglieder mit einer neuen Liste von Benutzern. User.objects.filter(id__in=members_ids) sucht alle Benutzer, deren ID in der Liste members_ids enthalten ist.
+        board = Board.objects.create(title=validated_data['title'], owner=owner)
+        board.members.set(users)
         return board
 
 class BoardDetailSerializer(serializers.ModelSerializer):
     members = UserSerializer(many=True, read_only=True)
     tasks = TaskSerializer(many=True, read_only=True)
+
     class Meta:
         model = Board
         fields = [
@@ -117,7 +126,7 @@ class BoardDetailSerializer(serializers.ModelSerializer):
         ]
 
 class BoardUpdateSerializer(serializers.ModelSerializer):
-    members = serializers.ListField(child=serializers.IntegerField(), write_only=True)
+    members = serializers.ListField(child=serializers.IntegerField(), write_only=True, required=False)
     owner_data = UserSerializer(source='owner', read_only=True)
     members_data = UserSerializer(source='members', many=True, read_only=True)
 
@@ -125,20 +134,25 @@ class BoardUpdateSerializer(serializers.ModelSerializer):
         model = Board
         fields = ['id', 'title', 'members', 'owner_data', 'members_data']
 
-    def update(self, instance, validated_data):
-        members_ids = validated_data.pop('members', [])
+    def validate_members(self, value):
+        owner_id = self.instance.owner.id if self.instance else None
+        if owner_id and owner_id not in value:
+            value.append(owner_id)
 
-        owner_id = instance.owner.id
-        if owner_id not in members_ids:
-            members_ids.append(owner_id)
-
-        users = User.objects.filter(id__in=members_ids)
-        if len(users) != len(set(members_ids)):
+        users = User.objects.filter(id__in=value)
+        if len(users) != len(set(value)):
             raise serializers.ValidationError("Ein oder mehrere Benutzer Ids sind ungültig")
-        
+        return value
+    
+    def update(self, instance, validated_data):
+        members_ids = validated_data.get('members', None)
+
         instance.title = validated_data.get('title', instance.title)
         instance.save()
-        instance.members.set(users)
+        if members_ids is not None:
+            users = User.objects.filter(id__in=members_ids)
+            instance.members.set(users)
+
         return instance
 
 
