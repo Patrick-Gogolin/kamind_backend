@@ -3,39 +3,51 @@ from rest_framework.permissions import IsAuthenticated
 from kanban_app.models import Board, Task, Comment
 from kanban_app.api.permissions import IsTaskBoardMemberOrOwner, IsBoardMemberOrOwner, IsCommentAuthor
 from django.db.models import Q, Count
-from .serializers import BoardSerializer, BoardDetailSerializer, BoardUpdateSerializer, TaskSerializer, CommentSerializer
 from rest_framework.response import Response
+from .serializers import BoardSerializer, BoardDetailSerializer, BoardUpdateSerializer, TaskSerializer, CommentSerializer
 from rest_framework import generics
 from rest_framework.generics import DestroyAPIView, ListAPIView
+from rest_framework.viewsets import ModelViewSet
+from rest_framework.decorators import action
 
-class BoardListCreateView(ListCreateAPIView):
+class BoardViewSet(ModelViewSet):
     queryset = Board.objects.all()
-    serializer_class = BoardSerializer
     permission_classes = [IsAuthenticated, IsBoardMemberOrOwner]
 
     def get_queryset(self):
         user = self.request.user
-        return Board.objects.filter(Q(owner=user) | Q(members=user)).distinct()
+        action = self.action
 
-
-class BoardDetailView(generics.RetrieveUpdateDestroyAPIView):
-    queryset = Board.objects.all()
-    permission_classes = [IsAuthenticated, IsBoardMemberOrOwner]
-
+        if action == 'list':
+            return Board.objects.filter(Q(owner=user) | Q(members=user)).distinct()
+        else:
+            return Board.objects.all()
+    
     def get_serializer_class(self):
-        if self.request.method in ['PUT', 'PATCH']:
+        if self.action == 'list' or self.action == 'create':
+            return BoardSerializer
+        elif self.action in ['update', 'partial_update']:
             return BoardUpdateSerializer
         return BoardDetailSerializer
 
-class TaskCreateView(generics.CreateAPIView):
+class TaskViewSet(ModelViewSet):
     queryset = Task.objects.all()
     serializer_class = TaskSerializer
     permission_classes = [IsAuthenticated, IsTaskBoardMemberOrOwner]
 
-class TaskUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView):
-    queryset = Task.objects.all()
-    serializer_class = TaskSerializer
-    permission_classes = [IsAuthenticated, IsTaskBoardMemberOrOwner]
+    def list(self, request, *args, **kwargs):
+        return Response({"detail": "Listing all Tasks is not allowd"}, status = 405)
+    
+    @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated], url_path='assigned-to-me')
+    def assigned(self, request):
+        tasks = Task.objects.filter(assignee=request.user).annotate(comments_count=Count('comments'))
+        page = self.paginate_queryset(tasks)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+
+        serializer = self.get_serializer(tasks, many=True)
+        return Response(serializer.data)
 
 class TaskCommentListCreateView(ListCreateAPIView):
     serializer_class = CommentSerializer

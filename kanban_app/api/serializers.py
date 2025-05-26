@@ -15,6 +15,7 @@ class UserSerializer(serializers.ModelSerializer):
         return fullname
 
 class TaskSerializer(serializers.ModelSerializer):
+    board = serializers.IntegerField(write_only=True)
     assignee_id = serializers.IntegerField(write_only=True, required=False, allow_null=True)
     reviewer_id = serializers.IntegerField(write_only=True, required=False, allow_null=True)
     assignee = UserSerializer(read_only=True)
@@ -24,7 +25,7 @@ class TaskSerializer(serializers.ModelSerializer):
     class Meta:
         model = Task
         fields = [
-            'id', 'title', 'description', 'status', 'priority',
+            'id', 'board', 'title', 'description', 'status', 'priority',
             'assignee_id', 'reviewer_id', 'assignee', 'reviewer',
             'due_date', 'comments_count'
         ]
@@ -32,11 +33,24 @@ class TaskSerializer(serializers.ModelSerializer):
     
     def validate(self, data):
         request_user = self.context['request'].user
+        method = self.context['request'].method
         board = data.get('board')
 
-        if not board:
-            task = self.context['view'].get_object()
-            board = task.board
+        if method == 'POST':
+            board_id = data.get('board')
+            if not board_id:
+                raise serializers.ValidationError("board_id is required")
+        
+        else:
+            if 'board' in data:
+                raise serializers.ValidationError("Changing board is not allowed")
+        
+            board_id = self.instance.board.id if self.instance else None
+
+        try:
+            board = Board.objects.get(id=board_id)
+        except Board.DoesNotExist:
+            raise serializers.ValidationError("Board does not exist")
 
         if not board.members.filter(id=request_user.id).exists():
             raise serializers.ValidationError("Not a member of the board")
@@ -46,25 +60,26 @@ class TaskSerializer(serializers.ModelSerializer):
 
         if assignee_id and not board.members.filter(id=assignee_id).exists():
             raise serializers.ValidationError("Assignee is not a member of the board")
-        
+    
         if reviewer_id and not board.members.filter(id=reviewer_id).exists():
             raise serializers.ValidationError("Reviewer is not a member of the board")
-        
+
+        data['board'] = board
         return data
     
     def get_comments_count(self, obj):
         return obj.comments.count()
     
     def create(self, validated_data):
-        print(validated_data)
         request_user = self.context['request'].user
         assignee_id = validated_data.pop('assignee_id', None)
         reviewer_id = validated_data.pop('reviewer_id', None)
+        board = validated_data.pop('board')
 
         assignee = User.objects.get(id=assignee_id) if assignee_id else None
         reviewer = User.objects.get(id=reviewer_id) if reviewer_id else None
 
-        task = Task.objects.create(**validated_data, assignee=assignee, reviewer=reviewer, created_by=request_user)
+        task = Task.objects.create(board=board, assignee=assignee, reviewer=reviewer, created_by=request_user,  **validated_data)
         return task
 
 class BoardSerializer(serializers.ModelSerializer):
@@ -142,6 +157,24 @@ class BoardUpdateSerializer(serializers.ModelSerializer):
         users = User.objects.filter(id__in=value)
         if len(users) != len(set(value)):
             raise serializers.ValidationError("Ein oder mehrere Benutzer Ids sind ungültig")
+
+        current_member_ids = set(self.instance.members.values_list('id', flat=True))
+        new_members_ids = set(value)
+        removed_ids = current_member_ids - new_members_ids
+
+        board_tasks  = self.instance.tasks.all()
+
+        blocked_users = set()
+        for task in board_tasks:
+            if task.assignee_id in removed_ids or task.reviewer_id in removed_ids:
+                blocked_users.add(task.assignee_id)
+                blocked_users.add(task.reviewer_id)
+        
+        blocked_users.discard(None)
+
+        if blocked_users:
+            raise serializers.ValidationError(f"Folgende Benutzer können nicht entfernt werden, da sie mit Aufgaben verknüoft sind: {list(blocked_users)}")
+
         return value
     
     def update(self, instance, validated_data):
