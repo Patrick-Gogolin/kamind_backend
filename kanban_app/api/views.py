@@ -41,13 +41,17 @@ class TaskViewSet(ModelViewSet):
     @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated], url_path='assigned-to-me')
     def assigned(self, request):
         tasks = Task.objects.filter(assignee=request.user).annotate(comments_count=Count('comments'))
-        page = self.paginate_queryset(tasks)
-        if page is not None:
-            serializer = self.get_serializer(page, many=True)
-            return self.get_paginated_response(serializer.data)
 
         serializer = self.get_serializer(tasks, many=True)
         return Response(serializer.data)
+    
+    @action(detail=False, methods=['get'], permission_classes = [IsAuthenticated], url_path='reviewing')
+    def reviewed(self, request):
+        tasks = Task.objects.filter(reviewer=request.user).annotate(comments_count=Count('comments'))
+
+        serializer = self.get_serializer(tasks, many=True)
+        return Response(serializer.data)
+        
 
 class TaskCommentListCreateView(ListCreateAPIView):
     serializer_class = CommentSerializer

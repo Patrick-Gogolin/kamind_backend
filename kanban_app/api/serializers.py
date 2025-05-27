@@ -15,7 +15,7 @@ class UserSerializer(serializers.ModelSerializer):
         return fullname
 
 class TaskSerializer(serializers.ModelSerializer):
-    board = serializers.IntegerField(write_only=True)
+    board = serializers.PrimaryKeyRelatedField(queryset=Board.objects.all(), required=False)
     assignee_id = serializers.IntegerField(write_only=True, required=False, allow_null=True)
     reviewer_id = serializers.IntegerField(write_only=True, required=False, allow_null=True)
     assignee = UserSerializer(read_only=True)
@@ -30,6 +30,14 @@ class TaskSerializer(serializers.ModelSerializer):
             'due_date', 'comments_count'
         ]
         read_only_fields = ['id', 'assignee', 'reviewer', 'comments_count']
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        request = self.context.get('request')
+        if request and request.method == 'PATCH':
+            data.pop('board', None)
+
+        return data
     
     def validate(self, data):
         request_user = self.context['request'].user
@@ -37,22 +45,18 @@ class TaskSerializer(serializers.ModelSerializer):
         board = data.get('board')
 
         if method == 'POST':
-            board_id = data.get('board')
-            if not board_id:
+            board = data.get('board')
+            if not board:
                 raise serializers.ValidationError("board_id is required")
         
         else:
             if 'board' in data:
                 raise serializers.ValidationError("Changing board is not allowed")
         
-            board_id = self.instance.board.id if self.instance else None
+            board = self.instance.board if self.instance else None
 
-        try:
-            board = Board.objects.get(id=board_id)
-        except Board.DoesNotExist:
-            raise serializers.ValidationError("Board does not exist")
 
-        if not board.members.filter(id=request_user.id).exists():
+        if board and not board.members.filter(id=request_user.id).exists():
             raise serializers.ValidationError("Not a member of the board")
 
         assignee_id = data.get('assignee_id')
@@ -65,6 +69,7 @@ class TaskSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("Reviewer is not a member of the board")
 
         data['board'] = board
+
         return data
     
     def get_comments_count(self, obj):
