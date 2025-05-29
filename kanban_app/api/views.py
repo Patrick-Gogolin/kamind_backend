@@ -1,14 +1,12 @@
-from rest_framework.generics import ListCreateAPIView
 from rest_framework.permissions import IsAuthenticated
 from kanban_app.models import Board, Task, Comment
 from kanban_app.api.permissions import IsTaskBoardMemberOrOwner, IsBoardMemberOrOwner, IsCommentAuthor
 from django.db.models import Q, Count
 from rest_framework.response import Response
 from .serializers import BoardSerializer, BoardDetailSerializer, BoardUpdateSerializer, TaskSerializer, CommentSerializer
-from rest_framework import generics
-from rest_framework.generics import DestroyAPIView, ListAPIView
 from rest_framework.viewsets import ModelViewSet
 from rest_framework.decorators import action
+from django.shortcuts import get_object_or_404
 
 class BoardViewSet(ModelViewSet):
     queryset = Board.objects.all()
@@ -51,41 +49,37 @@ class TaskViewSet(ModelViewSet):
 
         serializer = self.get_serializer(tasks, many=True)
         return Response(serializer.data)
-        
+    
 
-class TaskCommentListCreateView(ListCreateAPIView):
+class TaskCommentViewSet(ModelViewSet):
     serializer_class = CommentSerializer
-    permission_classes = [IsAuthenticated, IsTaskBoardMemberOrOwner]
+    permission_classes = [IsAuthenticated]
+
 
     def get_queryset(self):
-        task_id = self.kwargs.get('task_id')
+        task_id = self.kwargs.get('task_pk')
         return Comment.objects.filter(task_id=task_id)
     
     def perform_create(self, serializer):
-        task_id = self.kwargs.get('task_id')
-        task = Task.objects.get(id=task_id)
-        serializer.save(task=task)
+        task_id = self.kwargs.get('task_pk')
+        task = get_object_or_404(Task, id=task_id)
+        serializer.save(task=task, author=self.request.user)
+    
+    
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        self.check_object_permissions(request, instance) 
+        return super().destroy(request, *args, **kwargs)
 
-class TaskCommentDestroyView(DestroyAPIView):
-    queryset = Comment.objects.all()
-    serializer_class = CommentSerializer
-    permission_classes = [IsAuthenticated, IsCommentAuthor]
+    def get_permissions(self):
+        if self.action == 'destroy':
+            permission_classes = [IsAuthenticated, IsCommentAuthor]
+        else:
+            permission_classes = [IsAuthenticated, IsTaskBoardMemberOrOwner]
+        return [permission() for permission in permission_classes]
 
     def get_object(self):
-        task_id = self.kwargs.get('task_id')
-        comment_id = self.kwargs.get('comment_id')
-        return Comment.objects.get(id=comment_id, task=task_id)
-    
-class AssignedTasksListView(ListAPIView):
-    serializer_class = TaskSerializer
-    permission_classes = [IsAuthenticated]
-
-    def get_queryset(self):
-        return Task.objects.filter(assignee=self.request.user).annotate(comments_count=Count('comments'))
-
-class ToReviewTasksListView(ListAPIView):
-    serializer_class = TaskSerializer
-    permission_classes = [IsAuthenticated]
-
-    def get_queryset(self):
-        return Task.objects.filter(reviewer=self.request.user).annotate(comments_count=Count('comments'))
+        task_id = self.kwargs.get('task_pk')
+        comment_id = self.kwargs.get('pk')
+        obj = get_object_or_404(Comment, id=comment_id, task_id=task_id)
+        return obj

@@ -1,4 +1,4 @@
-from rest_framework.permissions import BasePermission, SAFE_METHODS
+from rest_framework.permissions import BasePermission
 from kanban_app.models import Board, Task
 
 
@@ -21,6 +21,7 @@ class IsTaskBoardMemberOrOwner(BasePermission):
     def has_permission(self, request, view):
         if request.method == "POST":
             board_id = request.data.get('board')
+            print(board_id)
             if board_id:
                 try:
                     board = Board.objects.get(id=board_id)
@@ -28,7 +29,8 @@ class IsTaskBoardMemberOrOwner(BasePermission):
                     return False
             else:
                 # Für KOmmentare: Board über Task ID aus der URL holen
-                task_id = view.kwargs.get('task_id')
+                task_id = view.kwargs.get('task_pk')
+                print("DEBUG: task_id =", task_id)  # <-- Debug
                 if not task_id:
                     return False
                 try: 
