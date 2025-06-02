@@ -35,6 +35,12 @@ class TaskViewSet(ModelViewSet):
 
     def list(self, request, *args, **kwargs):
         return Response({"detail": "Listing all Tasks is not allowed"}, status = 405)
+
+
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        self.check_object_permissions(request, instance)
+        return super().destroy(request, *args, **kwargs)
     
     @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated], url_path='assigned-to-me')
     def assigned(self, request):
@@ -64,7 +70,6 @@ class TaskCommentViewSet(ModelViewSet):
         task_id = self.kwargs.get('task_pk')
         task = get_object_or_404(Task, id=task_id)
         serializer.save(task=task, author=self.request.user)
-    
     
     def destroy(self, request, *args, **kwargs):
         instance = self.get_object()

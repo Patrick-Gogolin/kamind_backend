@@ -36,7 +36,7 @@ class Task(models.Model):
 
 
 class Comment(models.Model):
-    task = models.ForeignKey(Task, on_delete=models.CASCADE, related_name='comments') #Zu welcher Task gehört der Kommentar?
-    author = models.ForeignKey(User, on_delete=models.CASCADE)# Wer hat ihn geschrieben?
-    content = models.TextField() # Was steht drin?
-    created_at = models.DateTimeField(auto_now_add=True) # Wann wurde er geschrieben?
+    task = models.ForeignKey(Task, on_delete=models.CASCADE, related_name='comments')
+    author = models.ForeignKey(User, on_delete=models.CASCADE)
+    content = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)

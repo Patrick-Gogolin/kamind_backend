@@ -36,6 +36,7 @@ class TaskSerializer(serializers.ModelSerializer):
         request = self.context.get('request')
         if request and request.method == 'PATCH':
             data.pop('board', None)
+            data.pop('comments_count', None)
 
         return data
     
@@ -203,9 +204,9 @@ class CommentSerializer(serializers.ModelSerializer):
         read_only_fields = ['id', 'created_at', 'author']
 
     def get_author(self, obj):
-        return f"{obj.author.first_name} {obj.author.last_name}".strip()#obj ist ein einzelner KOmmentar, obj.user ist der user, der den KOmmentar geschrieben hat
+        return f"{obj.author.first_name} {obj.author.last_name}".strip()
     
-    def create(self, validated_data): #Methode wird aufgerufen wenn ein neuer Kommentar gespeichert wird
+    def create(self, validated_data):
         request = self.context['request']
         validated_data['author'] = request.user
         return super().create(validated_data)
