@@ -34,7 +34,7 @@ class TaskViewSet(ModelViewSet):
     permission_classes = [IsAuthenticated, IsTaskBoardMemberOrOwner]
 
     def list(self, request, *args, **kwargs):
-        return Response({"detail": "Listing all Tasks is not allowd"}, status = 405)
+        return Response({"detail": "Listing all Tasks is not allowed"}, status = 405)
     
     @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated], url_path='assigned-to-me')
     def assigned(self, request):

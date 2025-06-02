@@ -66,6 +66,7 @@ class EmailCheckView(APIView):
 
     def get(self, request):
         email = request.query_params.get('email')
+
         if not email:
             return Response(
                 {"error": "Die E-Mail-Adresse fehlt oder hat ein falsches Format."},
@@ -81,5 +82,10 @@ class EmailCheckView(APIView):
             },status=status.HTTP_200_OK)
         
         except User.DoesNotExist:
-            return Response({'error': 'Der Benutzer muss eingeloggt sein'},
-                             status=status.HTTP_401_UNAUTHORIZED)
+            return Response({'error': 'E-Mail-Adresse wurde nicht gefunden'},
+                             status=status.HTTP_404_NOT_FOUND)
+
+        except Exception as e:
+            return Response({
+                "error": "Ein interner Serverfehler ist aufgetreten"
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
